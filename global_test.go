@@ -5,6 +5,14 @@ import (
 	"testing"
 )
 
+const (
+	testProviderTelegram = "telegram"
+	testProviderMock     = "mock"
+	testProviderMock1    = "mock1"
+	testProviderMock2    = "mock2"
+	testProviderCustom   = "custom"
+)
+
 // MockNotifier for testing
 type mockGlobalNotifier struct {
 	name        string
@@ -73,7 +81,7 @@ func TestGlobalSetup(t *testing.T) {
 		t.Errorf("Expected 1 notifier, got %d", len(notifiers))
 	}
 
-	if notifiers[0] != "telegram" {
+	if notifiers[0] != testProviderTelegram {
 		t.Errorf("Expected telegram notifier, got %s", notifiers[0])
 	}
 }
@@ -81,14 +89,14 @@ func TestGlobalSetup(t *testing.T) {
 func TestGlobalRegister(t *testing.T) {
 	Reset()
 
-	mock := &mockGlobalNotifier{name: "mock"}
+	mock := &mockGlobalNotifier{name: testProviderMock}
 	err := Register(mock)
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
 	// Check registration
-	notifier, exists := Get("mock")
+	notifier, exists := Get(testProviderMock)
 	if !exists {
 		t.Error("Expected notifier to be registered")
 	}
@@ -101,11 +109,14 @@ func TestGlobalRegister(t *testing.T) {
 func TestGlobalSend(t *testing.T) {
 	Reset()
 
-	mock := &mockGlobalNotifier{name: "mock"}
-	Register(mock)
+	mock := &mockGlobalNotifier{name: testProviderMock}
+	err := Register(mock)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
 
 	ctx := context.Background()
-	err := Send(ctx, "mock", "test message")
+	err = Send(ctx, testProviderMock, "test message")
 	if err != nil {
 		t.Fatalf("Send failed: %v", err)
 	}
@@ -122,8 +133,11 @@ func TestGlobalSend(t *testing.T) {
 func TestGlobalSendWithOptions(t *testing.T) {
 	Reset()
 
-	mock := &mockGlobalNotifier{name: "mock"}
-	Register(mock)
+	mock := &mockGlobalNotifier{name: testProviderMock}
+	err := Register(mock)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
 
 	ctx := context.Background()
 	msg := &Message{
@@ -132,7 +146,7 @@ func TestGlobalSendWithOptions(t *testing.T) {
 		Priority: PriorityHigh,
 	}
 
-	err := SendWithOptions(ctx, "mock", msg)
+	err = SendWithOptions(ctx, testProviderMock, msg)
 	if err != nil {
 		t.Fatalf("SendWithOptions failed: %v", err)
 	}
@@ -145,11 +159,15 @@ func TestGlobalSendWithOptions(t *testing.T) {
 func TestGlobalBroadcast(t *testing.T) {
 	Reset()
 
-	mock1 := &mockGlobalNotifier{name: "mock1"}
-	mock2 := &mockGlobalNotifier{name: "mock2"}
+	mock1 := &mockGlobalNotifier{name: testProviderMock1}
+	mock2 := &mockGlobalNotifier{name: testProviderMock2}
 
-	Register(mock1)
-	Register(mock2)
+	if err := Register(mock1); err != nil {
+		t.Fatalf("Register mock1 failed: %v", err)
+	}
+	if err := Register(mock2); err != nil {
+		t.Fatalf("Register mock2 failed: %v", err)
+	}
 
 	ctx := context.Background()
 	errors := Broadcast(ctx, "broadcast message")
@@ -170,11 +188,15 @@ func TestGlobalBroadcast(t *testing.T) {
 func TestGlobalBroadcastWithErrors(t *testing.T) {
 	Reset()
 
-	mock1 := &mockGlobalNotifier{name: "mock1", shouldFail: true}
-	mock2 := &mockGlobalNotifier{name: "mock2"}
+	mock1 := &mockGlobalNotifier{name: testProviderMock1, shouldFail: true}
+	mock2 := &mockGlobalNotifier{name: testProviderMock2}
 
-	Register(mock1)
-	Register(mock2)
+	if err := Register(mock1); err != nil {
+		t.Fatalf("Register mock1 failed: %v", err)
+	}
+	if err := Register(mock2); err != nil {
+		t.Fatalf("Register mock2 failed: %v", err)
+	}
 
 	ctx := context.Background()
 	errors := Broadcast(ctx, "test")
@@ -192,11 +214,15 @@ func TestGlobalBroadcastWithErrors(t *testing.T) {
 func TestGlobalBroadcastAsync(t *testing.T) {
 	Reset()
 
-	mock1 := &mockGlobalNotifier{name: "mock1"}
-	mock2 := &mockGlobalNotifier{name: "mock2"}
+	mock1 := &mockGlobalNotifier{name: testProviderMock1}
+	mock2 := &mockGlobalNotifier{name: testProviderMock2}
 
-	Register(mock1)
-	Register(mock2)
+	if err := Register(mock1); err != nil {
+		t.Fatalf("Register mock1 failed: %v", err)
+	}
+	if err := Register(mock2); err != nil {
+		t.Fatalf("Register mock2 failed: %v", err)
+	}
 
 	ctx := context.Background()
 	resultChan := BroadcastAsync(ctx, "async message")
@@ -216,11 +242,15 @@ func TestGlobalBroadcastAsync(t *testing.T) {
 func TestGlobalBroadcastAsyncWithOptions(t *testing.T) {
 	Reset()
 
-	mock1 := &mockGlobalNotifier{name: "mock1"}
-	mock2 := &mockGlobalNotifier{name: "mock2"}
+	mock1 := &mockGlobalNotifier{name: testProviderMock1}
+	mock2 := &mockGlobalNotifier{name: testProviderMock2}
 
-	Register(mock1)
-	Register(mock2)
+	if err := Register(mock1); err != nil {
+		t.Fatalf("Register mock1 failed: %v", err)
+	}
+	if err := Register(mock2); err != nil {
+		t.Fatalf("Register mock2 failed: %v", err)
+	}
 
 	ctx := context.Background()
 	msg := &Message{
@@ -242,20 +272,22 @@ func TestGlobalBroadcastAsyncWithOptions(t *testing.T) {
 func TestGlobalUnregister(t *testing.T) {
 	Reset()
 
-	mock := &mockGlobalNotifier{name: "mock"}
-	Register(mock)
+	mock := &mockGlobalNotifier{name: testProviderMock}
+	if err := Register(mock); err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
 
 	// Verify it's registered
-	_, exists := Get("mock")
+	_, exists := Get(testProviderMock)
 	if !exists {
 		t.Error("Expected notifier to be registered")
 	}
 
 	// Unregister
-	Unregister("mock")
+	Unregister(testProviderMock)
 
 	// Verify it's unregistered
-	_, exists = Get("mock")
+	_, exists = Get(testProviderMock)
 	if exists {
 		t.Error("Expected notifier to be unregistered")
 	}
@@ -264,11 +296,15 @@ func TestGlobalUnregister(t *testing.T) {
 func TestGlobalList(t *testing.T) {
 	Reset()
 
-	mock1 := &mockGlobalNotifier{name: "mock1"}
-	mock2 := &mockGlobalNotifier{name: "mock2"}
+	mock1 := &mockGlobalNotifier{name: testProviderMock1}
+	mock2 := &mockGlobalNotifier{name: testProviderMock2}
 
-	Register(mock1)
-	Register(mock2)
+	if err := Register(mock1); err != nil {
+		t.Fatalf("Register mock1 failed: %v", err)
+	}
+	if err := Register(mock2); err != nil {
+		t.Fatalf("Register mock2 failed: %v", err)
+	}
 
 	list := List()
 	if len(list) != 2 {
@@ -279,8 +315,10 @@ func TestGlobalList(t *testing.T) {
 func TestGlobalReset(t *testing.T) {
 	Reset()
 
-	mock := &mockGlobalNotifier{name: "mock"}
-	Register(mock)
+	mock := &mockGlobalNotifier{name: testProviderMock}
+	if err := Register(mock); err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
 
 	// Verify registration
 	if len(List()) != 1 {
@@ -308,7 +346,7 @@ func TestGlobalAutoInit(t *testing.T) {
 	}
 
 	// Verify it works
-	mock := &mockGlobalNotifier{name: "mock"}
+	mock := &mockGlobalNotifier{name: testProviderMock}
 	err := Register(mock)
 	if err != nil {
 		t.Errorf("Register failed after auto-init: %v", err)
@@ -352,13 +390,13 @@ func TestGlobalSetupWithMultipleConfigs(t *testing.T) {
 func TestGlobalSetupWithCustomNotifier(t *testing.T) {
 	Reset()
 
-	mock := &mockGlobalNotifier{name: "custom"}
+	mock := &mockGlobalNotifier{name: testProviderCustom}
 	err := Setup(mock)
 	if err != nil {
 		t.Fatalf("Setup with custom notifier failed: %v", err)
 	}
 
-	notifier, exists := Get("custom")
+	notifier, exists := Get(testProviderCustom)
 	if !exists {
 		t.Error("Expected custom notifier to be registered")
 	}
