@@ -6,6 +6,7 @@ A flexible and extensible Go library for sending notifications across multiple p
 
 - 🚀 **Multi-Platform Support**: Send notifications to Telegram, Slack, and easily extend to other platforms
 - 🎯 **Simple Interface**: Clean and intuitive API for sending notifications
+- 🌍 **Global Singleton**: Initialize once, use anywhere - no need to pass configs around
 - 📦 **Manager Pattern**: Centralized management of multiple notification providers
 - ⚡ **Async Broadcasting**: Send notifications to multiple platforms concurrently
 - 🔧 **Extensible**: Implement your own custom notification providers
@@ -20,6 +21,59 @@ go get github.com/Doraverse-Workspace/notify
 ```
 
 ## Quick Start
+
+### Global Singleton Pattern (Recommended)
+
+The easiest way to use notify is with the global singleton pattern. Initialize once at application startup and use anywhere:
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "os"
+    
+    "github.com/Doraverse-Workspace/notify"
+)
+
+func main() {
+    // Initialize once at application startup
+    err := notify.Setup(
+        notify.TelegramConfig{
+            BotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
+            ChatID:   os.Getenv("TELEGRAM_CHAT_ID"),
+        },
+        &notify.SlackConfig{
+            Token:          os.Getenv("SLACK_BOT_TOKEN"),
+            DefaultChannel: os.Getenv("SLACK_CHANNEL"),
+        },
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Now use anywhere in your application without passing configs
+    ctx := context.Background()
+    
+    // Send to specific provider
+    notify.Send(ctx, "telegram", "Hello from notify! 🚀")
+    
+    // Broadcast to all providers
+    notify.Broadcast(ctx, "Broadcasting to everyone! 📢")
+    
+    // Use in other functions - no need to pass manager around
+    sendAlert(ctx, "System alert!")
+}
+
+func sendAlert(ctx context.Context, message string) {
+    // Just use global functions - no initialization needed!
+    err := notify.Send(ctx, "telegram", message)
+    if err != nil {
+        log.Printf("Failed to send: %v", err)
+    }
+}
+```
 
 ### Telegram
 
@@ -86,6 +140,83 @@ func main() {
 ```
 
 ## Usage
+
+### Initialization Methods
+
+There are multiple ways to use the notify library:
+
+#### 1. Global Singleton with Setup (Recommended)
+
+```go
+// Initialize all providers at once
+err := notify.Setup(
+    notify.TelegramConfig{BotToken: "...", ChatID: "..."},
+    &notify.SlackConfig{Token: "...", DefaultChannel: "..."},
+)
+
+// Use anywhere in your application
+notify.Send(ctx, "telegram", "Hello!")
+notify.Broadcast(ctx, "Broadcast message!")
+```
+
+#### 2. Global Singleton with Manual Registration
+
+```go
+// Initialize global manager
+notify.Init()
+
+// Create and register notifiers manually
+telegram, _ := notify.NewTelegramNotifier(telegramConfig)
+notify.Register(telegram)
+
+// Use global functions
+notify.Send(ctx, "telegram", "Hello!")
+```
+
+#### 3. Local Manager Instance
+
+```go
+// Create a local manager
+manager := notify.NewManager()
+
+// Register notifiers
+telegram, _ := notify.NewTelegramNotifier(telegramConfig)
+manager.Register(telegram)
+
+// Use the manager instance
+manager.Send(ctx, "telegram", "Hello!")
+```
+
+#### 4. Direct Notifier Usage
+
+```go
+// Create and use notifier directly
+telegram, _ := notify.NewTelegramNotifier(telegramConfig)
+telegram.Send(ctx, "Hello!")
+```
+
+### Global Functions
+
+When using the global singleton pattern, these functions are available:
+
+```go
+// Provider management
+notify.Register(notifier)       // Register a notifier
+notify.Unregister(name)         // Unregister a notifier
+notify.Get(name)                // Get a specific notifier
+notify.List()                   // List all registered notifiers
+
+// Sending messages
+notify.Send(ctx, provider, message)              // Send to specific provider
+notify.SendWithOptions(ctx, provider, msg)       // Send with options
+notify.Broadcast(ctx, message)                   // Broadcast to all
+notify.BroadcastWithOptions(ctx, msg)            // Broadcast with options
+notify.BroadcastAsync(ctx, message)              // Async broadcast
+notify.BroadcastAsyncWithOptions(ctx, msg)       // Async broadcast with options
+
+// Direct access to manager
+manager := notify.Global()      // Get the global manager instance
+```
 
 ### Rich Messages
 
@@ -286,6 +417,7 @@ BroadcastAsyncWithOptions(ctx context.Context, msg *Message) <-chan Notification
 
 Check out the [examples](./examples) directory for complete working examples:
 
+- [global](./examples/global) - **Recommended**: Using the global singleton pattern
 - [simple](./examples/simple) - Basic usage of Telegram and Slack
 - [manager](./examples/manager) - Using the Manager for multiple providers
 - [custom](./examples/custom) - Implementing custom notification providers
@@ -324,28 +456,55 @@ if err != nil {
 
 ## Best Practices
 
-1. **Use Context**: Always pass a context with timeout for production use:
+1. **Use Global Singleton**: For most applications, use the global singleton pattern:
+   ```go
+   // In main.go or init function
+   notify.Setup(telegramConfig, slackConfig)
+   
+   // Use anywhere in your application
+   notify.Send(ctx, "telegram", message)
+   ```
+
+2. **Use Context**: Always pass a context with timeout for production use:
    ```go
    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
    defer cancel()
    ```
 
-2. **Environment Variables**: Store tokens in environment variables, never in code:
+3. **Environment Variables**: Store tokens in environment variables, never in code:
    ```go
    token := os.Getenv("TELEGRAM_BOT_TOKEN")
    ```
 
-3. **Error Handling**: Always check errors and handle them appropriately:
+4. **Error Handling**: Always check errors and handle them appropriately:
    ```go
-   if err := notifier.Send(ctx, msg); err != nil {
+   if err := notify.Send(ctx, "telegram", msg); err != nil {
        log.Printf("Failed to send notification: %v", err)
        // Implement retry logic or fallback
    }
    ```
 
-4. **Async for Multiple Providers**: Use async broadcasting when sending to multiple providers:
+5. **Async for Multiple Providers**: Use async broadcasting when sending to multiple providers:
    ```go
-   resultChan := manager.BroadcastAsync(ctx, message)
+   resultChan := notify.BroadcastAsync(ctx, message)
+   for result := range resultChan {
+       if !result.Success {
+           log.Printf("Failed to send to %s: %v", result.Provider, result.Error)
+       }
+   }
+   ```
+
+6. **Initialize Once**: Call `notify.Setup()` or `notify.Init()` only once at application startup:
+   ```go
+   func main() {
+       // Initialize once
+       if err := notify.Setup(configs...); err != nil {
+           log.Fatal(err)
+       }
+       
+       // Use everywhere
+       startServer()
+   }
    ```
 
 ## Testing

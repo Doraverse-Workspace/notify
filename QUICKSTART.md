@@ -8,6 +8,67 @@ Get started with `notify` in 5 minutes! 🚀
 go get github.com/Doraverse-Workspace/notify
 ```
 
+## Recommended: Global Singleton Pattern ⭐
+
+**Initialize once, use everywhere!** No need to pass configs around.
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "os"
+    "github.com/Doraverse-Workspace/notify"
+)
+
+func main() {
+    // Initialize ONCE at startup
+    err := notify.Setup(
+        notify.TelegramConfig{
+            BotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
+            ChatID:   os.Getenv("TELEGRAM_CHAT_ID"),
+        },
+        &notify.SlackConfig{
+            Token:          os.Getenv("SLACK_BOT_TOKEN"),
+            DefaultChannel: os.Getenv("SLACK_CHANNEL"),
+        },
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Use ANYWHERE in your app - no init needed!
+    notify.Send(context.Background(), "telegram", "Hello! 🎉")
+    notify.Broadcast(context.Background(), "Broadcasting to all! 📢")
+    
+    // Call from other functions
+    sendAlert()
+    processOrder()
+}
+
+func sendAlert() {
+    // No need to pass config or manager!
+    notify.Send(context.Background(), "telegram", "Alert message!")
+}
+
+func processOrder() {
+    // Works everywhere!
+    msg := &notify.Message{
+        Title:    "New Order",
+        Text:     "Order #123 processed",
+        Priority: notify.PriorityHigh,
+    }
+    notify.BroadcastWithOptions(context.Background(), msg)
+}
+```
+
+**Benefits:**
+- ✅ Initialize once, use everywhere
+- ✅ No need to pass configs around
+- ✅ Clean and simple code
+- ✅ Thread-safe
+
 ## 1. Telegram Notifications
 
 ### Setup
@@ -153,12 +214,36 @@ Load in your code:
 import _ "github.com/joho/godotenv/autoload"
 ```
 
+## Global Functions Reference
+
+When using the global singleton pattern, these functions are available:
+
+```go
+// Setup & Management
+notify.Setup(configs...)        // Initialize with configs
+notify.Init()                   // Initialize empty manager
+notify.Register(notifier)       // Register a notifier
+notify.Unregister(name)         // Unregister a notifier
+notify.Get(name)                // Get specific notifier
+notify.List()                   // List all notifiers
+notify.Global()                 // Get global manager instance
+
+// Send Messages
+notify.Send(ctx, provider, message)
+notify.SendWithOptions(ctx, provider, msg)
+notify.Broadcast(ctx, message)
+notify.BroadcastWithOptions(ctx, msg)
+notify.BroadcastAsync(ctx, message)
+notify.BroadcastAsyncWithOptions(ctx, msg)
+```
+
 ## Common Use Cases
 
-### 1. Server Monitoring
+### 1. Server Monitoring (using global functions)
 ```go
 if cpuUsage > 80 {
-    notifier.Send(ctx, "⚠️ High CPU usage: " + fmt.Sprintf("%.1f%%", cpuUsage))
+    notify.Send(ctx, "telegram", 
+        fmt.Sprintf("⚠️ High CPU usage: %.1f%%", cpuUsage))
 }
 ```
 
@@ -176,13 +261,13 @@ msg := &notify.Message{
         },
     },
 }
-manager.BroadcastWithOptions(ctx, msg)
+notify.BroadcastWithOptions(ctx, msg)
 ```
 
 ### 3. Error Alerts
 ```go
 if err != nil {
-    telegram.Send(ctx, fmt.Sprintf("🔥 Error: %v", err))
+    notify.Send(ctx, "telegram", fmt.Sprintf("🔥 Error: %v", err))
 }
 ```
 
@@ -201,7 +286,7 @@ func sendDailyReport() {
             },
         },
     }
-    manager.BroadcastWithOptions(context.Background(), msg)
+    notify.BroadcastWithOptions(context.Background(), msg)
 }
 ```
 
@@ -213,8 +298,14 @@ Run the examples:
 # Set environment variables first
 export TELEGRAM_BOT_TOKEN="your_token"
 export TELEGRAM_CHAT_ID="your_chat_id"
+export SLACK_BOT_TOKEN="your_token"
+export SLACK_CHANNEL="#general"
 
-# Run example
+# Run global singleton example (recommended)
+cd examples/global
+go run main.go
+
+# Or run simple example
 cd examples/simple
 go run main.go
 ```
@@ -222,7 +313,8 @@ go run main.go
 ## Next Steps
 
 - Read the full [README.md](README.md) for detailed documentation
-- Check out [examples/](examples/) for more complete examples
+- Check out [examples/global/](examples/global/) for the global singleton pattern
+- Explore [examples/](examples/) for more complete examples
 - Learn about [custom providers](examples/custom/main.go)
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) to add new providers
 
