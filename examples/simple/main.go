@@ -31,7 +31,7 @@ func main() {
 
 	// Example 2: Simple Slack notification
 	fmt.Println("\nExample 2: Simple Slack notification")
-	slackNotifier, err := notify.NewSlackNotifier(notify.SlackConfig{
+	slackNotifier, err := notify.NewSlackNotifier(&notify.SlackConfig{
 		Token:          os.Getenv("SLACK_BOT_TOKEN"),
 		DefaultChannel: os.Getenv("SLACK_CHANNEL"),
 	})

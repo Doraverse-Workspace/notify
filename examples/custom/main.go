@@ -84,8 +84,12 @@ func main() {
 	emailNotifier := NewCustomNotifier("email")
 	smsNotifier := NewCustomNotifier("sms")
 
-	manager.Register(emailNotifier)
-	manager.Register(smsNotifier)
+	if err := manager.Register(emailNotifier); err != nil {
+		log.Printf("Failed to register email notifier: %v\n", err)
+	}
+	if err := manager.Register(smsNotifier); err != nil {
+		log.Printf("Failed to register SMS notifier: %v\n", err)
+	}
 
 	fmt.Printf("Registered notifiers: %v\n", manager.List())
 

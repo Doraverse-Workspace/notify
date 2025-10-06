@@ -35,7 +35,7 @@ func main() {
 
 	// Register Slack notifier
 	if slackToken := os.Getenv("SLACK_BOT_TOKEN"); slackToken != "" {
-		slackNotifier, err := notify.NewSlackNotifier(notify.SlackConfig{
+		slackNotifier, err := notify.NewSlackNotifier(&notify.SlackConfig{
 			Token:          slackToken,
 			DefaultChannel: os.Getenv("SLACK_CHANNEL"),
 		})

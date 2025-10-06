@@ -40,7 +40,9 @@ func TestManagerUnregister(t *testing.T) {
 	manager := NewManager()
 	notifier := NewMockNotifier("test")
 
-	manager.Register(notifier)
+	if err := manager.Register(notifier); err != nil {
+		t.Fatalf("Failed to register notifier: %v", err)
+	}
 	manager.Unregister("test")
 
 	if len(manager.List()) != 0 {
@@ -52,7 +54,9 @@ func TestManagerGet(t *testing.T) {
 	manager := NewManager()
 	notifier := NewMockNotifier("test")
 
-	manager.Register(notifier)
+	if err := manager.Register(notifier); err != nil {
+		t.Fatalf("Failed to register notifier: %v", err)
+	}
 
 	retrieved, exists := manager.Get("test")
 	if !exists {
@@ -72,7 +76,9 @@ func TestManagerGet(t *testing.T) {
 func TestManagerSend(t *testing.T) {
 	manager := NewManager()
 	notifier := NewMockNotifier("test")
-	manager.Register(notifier)
+	if err := manager.Register(notifier); err != nil {
+		t.Fatalf("Failed to register notifier: %v", err)
+	}
 
 	ctx := context.Background()
 	err := manager.Send(ctx, "test", "Hello")
@@ -94,8 +100,12 @@ func TestManagerBroadcast(t *testing.T) {
 	notifier1 := NewMockNotifier("test1")
 	notifier2 := NewMockNotifier("test2")
 
-	manager.Register(notifier1)
-	manager.Register(notifier2)
+	if err := manager.Register(notifier1); err != nil {
+		t.Fatalf("Failed to register notifier1: %v", err)
+	}
+	if err := manager.Register(notifier2); err != nil {
+		t.Fatalf("Failed to register notifier2: %v", err)
+	}
 
 	ctx := context.Background()
 	errors := manager.Broadcast(ctx, "Broadcast message")
@@ -115,8 +125,12 @@ func TestManagerBroadcastWithErrors(t *testing.T) {
 	notifier2 := NewMockNotifier("test2")
 	notifier2.shouldFail = true
 
-	manager.Register(notifier1)
-	manager.Register(notifier2)
+	if err := manager.Register(notifier1); err != nil {
+		t.Fatalf("Failed to register notifier1: %v", err)
+	}
+	if err := manager.Register(notifier2); err != nil {
+		t.Fatalf("Failed to register notifier2: %v", err)
+	}
 
 	ctx := context.Background()
 	errors := manager.Broadcast(ctx, "Broadcast message")
@@ -131,8 +145,12 @@ func TestManagerBroadcastAsync(t *testing.T) {
 	notifier1 := NewMockNotifier("test1")
 	notifier2 := NewMockNotifier("test2")
 
-	manager.Register(notifier1)
-	manager.Register(notifier2)
+	if err := manager.Register(notifier1); err != nil {
+		t.Fatalf("Failed to register notifier1: %v", err)
+	}
+	if err := manager.Register(notifier2); err != nil {
+		t.Fatalf("Failed to register notifier2: %v", err)
+	}
 
 	ctx := context.Background()
 	resultChan := manager.BroadcastAsync(ctx, "Async message")
@@ -160,7 +178,9 @@ func TestManagerBroadcastAsync(t *testing.T) {
 func TestManagerSendWithOptions(t *testing.T) {
 	manager := NewManager()
 	notifier := NewMockNotifier("test")
-	manager.Register(notifier)
+	if err := manager.Register(notifier); err != nil {
+		t.Fatalf("Failed to register notifier: %v", err)
+	}
 
 	ctx := context.Background()
 	msg := &Message{

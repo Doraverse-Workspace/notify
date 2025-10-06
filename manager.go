@@ -118,39 +118,20 @@ func (m *Manager) BroadcastWithOptions(ctx context.Context, msg *Message) []erro
 
 // BroadcastAsync sends a message to all registered notifiers asynchronously
 func (m *Manager) BroadcastAsync(ctx context.Context, message string) <-chan NotificationResult {
-	m.mu.RLock()
-	notifiers := make(map[string]Notifier, len(m.notifiers))
-	for name, notifier := range m.notifiers {
-		notifiers[name] = notifier
-	}
-	m.mu.RUnlock()
-
-	resultChan := make(chan NotificationResult, len(notifiers))
-
-	var wg sync.WaitGroup
-	for name, notifier := range notifiers {
-		wg.Add(1)
-		go func(n string, nt Notifier) {
-			defer wg.Done()
-			err := nt.Send(ctx, message)
-			resultChan <- NotificationResult{
-				Provider: n,
-				Success:  err == nil,
-				Error:    err,
-			}
-		}(name, notifier)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	return resultChan
+	return m.broadcastAsync(func(notifier Notifier) error {
+		return notifier.Send(ctx, message)
+	})
 }
 
 // BroadcastAsyncWithOptions sends a message with options to all registered notifiers asynchronously
 func (m *Manager) BroadcastAsyncWithOptions(ctx context.Context, msg *Message) <-chan NotificationResult {
+	return m.broadcastAsync(func(notifier Notifier) error {
+		return notifier.SendWithOptions(ctx, msg)
+	})
+}
+
+// broadcastAsync is a helper function to send notifications asynchronously
+func (m *Manager) broadcastAsync(sendFn func(Notifier) error) <-chan NotificationResult {
 	m.mu.RLock()
 	notifiers := make(map[string]Notifier, len(m.notifiers))
 	for name, notifier := range m.notifiers {
@@ -165,7 +146,7 @@ func (m *Manager) BroadcastAsyncWithOptions(ctx context.Context, msg *Message) <
 		wg.Add(1)
 		go func(n string, nt Notifier) {
 			defer wg.Done()
-			err := nt.SendWithOptions(ctx, msg)
+			err := sendFn(nt)
 			resultChan <- NotificationResult{
 				Provider: n,
 				Success:  err == nil,

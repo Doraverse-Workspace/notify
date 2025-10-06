@@ -34,7 +34,7 @@ type SlackConfig struct {
 }
 
 // NewSlackNotifier creates a new Slack notifier
-func NewSlackNotifier(config SlackConfig) (*SlackNotifier, error) {
+func NewSlackNotifier(config *SlackConfig) (*SlackNotifier, error) {
 	if config.Token == "" && config.WebhookURL == "" {
 		return nil, &NotificationError{
 			Provider: "slack",
