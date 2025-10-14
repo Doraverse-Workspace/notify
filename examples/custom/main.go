@@ -44,6 +44,14 @@ func (c *CustomNotifier) SendWithOptions(ctx context.Context, msg *notify.Messag
 	return nil
 }
 
+// SendRichMessage sends a rich message
+func (c *CustomNotifier) SendRichMessage(ctx context.Context, channel string, blocks interface{}) error {
+	// Implement your custom rich message logic here
+	fmt.Printf("[%s] Sending rich message to %s:\n", c.name, channel)
+	fmt.Printf("  Blocks: %v\n", blocks)
+	return nil
+}
+
 func main() {
 	ctx := context.Background()
 

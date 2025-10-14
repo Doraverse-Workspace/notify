@@ -116,6 +116,50 @@ func (t *TelegramNotifier) SendWithOptions(ctx context.Context, msg *Message) er
 	return t.sendRequest(ctx, "sendMessage", payload)
 }
 
+// SendRichMessage sends a rich message (for Telegram, this is similar to SendWithOptions)
+func (t *TelegramNotifier) SendRichMessage(ctx context.Context, channel string, blocks interface{}) error {
+	// For Telegram, we'll treat blocks as a simple text message
+	// This is a basic implementation - in practice, you might want to convert
+	// blocks to Telegram's formatting
+	messageText := ""
+	
+	// Try to convert blocks to string if it's a simple type
+	switch v := blocks.(type) {
+	case string:
+		messageText = v
+	case []interface{}:
+		// If it's an array, try to extract text from each element
+		for _, block := range v {
+			if text, ok := block.(string); ok {
+				messageText += text + "\n"
+			}
+		}
+	default:
+		// For other types, convert to string representation
+		messageText = fmt.Sprintf("%v", blocks)
+	}
+	
+	if messageText == "" {
+		return &NotificationError{
+			Provider: "telegram",
+			Message:  "no valid message content found in blocks",
+		}
+	}
+	
+	chatID := channel
+	if chatID == "" {
+		chatID = t.chatID
+	}
+	
+	payload := map[string]interface{}{
+		"chat_id":    chatID,
+		"text":       messageText,
+		"parse_mode": t.parseMode,
+	}
+	
+	return t.sendRequest(ctx, "sendMessage", payload)
+}
+
 // SendPhoto sends a photo with caption
 func (t *TelegramNotifier) SendPhoto(ctx context.Context, chatID, photoURL, caption string) error {
 	if chatID == "" {

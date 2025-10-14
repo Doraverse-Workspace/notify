@@ -86,6 +86,16 @@ func (m *Manager) SendWithOptions(ctx context.Context, provider string, msg *Mes
 	return notifier.SendWithOptions(ctx, msg)
 }
 
+// SendRichMessage sends a rich message to a specific notifier
+func (m *Manager) SendRichMessage(ctx context.Context, provider, channel string, blocks interface{}) error {
+	notifier, exists := m.Get(provider)
+	if !exists {
+		return fmt.Errorf("notifier %s not found", provider)
+	}
+
+	return notifier.SendRichMessage(ctx, channel, blocks)
+}
+
 // Broadcast sends a message to all registered notifiers
 func (m *Manager) Broadcast(ctx context.Context, message string) []error {
 	m.mu.RLock()

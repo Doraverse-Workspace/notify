@@ -147,7 +147,7 @@ func (s *SlackNotifier) SendWithOptions(ctx context.Context, msg *Message) error
 }
 
 // SendRichMessage sends a message with blocks for rich formatting
-func (s *SlackNotifier) SendRichMessage(ctx context.Context, channel string, blocks []slack.Block) error {
+func (s *SlackNotifier) SendRichMessage(ctx context.Context, channel string, blocks interface{}) error {
 	if s.client == nil {
 		return &NotificationError{
 			Provider: "slack",
@@ -159,10 +159,19 @@ func (s *SlackNotifier) SendRichMessage(ctx context.Context, channel string, blo
 		channel = s.defaultChannel
 	}
 
+	// Convert interface{} to []slack.Block
+	slackBlocks, ok := blocks.([]slack.Block)
+	if !ok {
+		return &NotificationError{
+			Provider: "slack",
+			Message:  "blocks must be of type []slack.Block",
+		}
+	}
+
 	_, _, err := s.client.PostMessageContext(
 		ctx,
 		channel,
-		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionBlocks(slackBlocks...),
 	)
 	if err != nil {
 		return &NotificationError{

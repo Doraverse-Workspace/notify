@@ -13,6 +13,9 @@ type Notifier interface {
 	// SendWithOptions sends a message with additional options
 	SendWithOptions(ctx context.Context, msg *Message) error
 
+	// SendRichMessage sends a rich message (provider-specific implementation)
+	SendRichMessage(ctx context.Context, channel string, blocks interface{}) error
+
 	// Name returns the name of the notification provider
 	Name() string
 }

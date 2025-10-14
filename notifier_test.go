@@ -2,6 +2,7 @@ package notify
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
 
@@ -36,6 +37,18 @@ func (m *MockNotifier) Send(ctx context.Context, message string) error {
 func (m *MockNotifier) SendWithOptions(ctx context.Context, msg *Message) error {
 	m.sendCalled = true
 	m.lastMessage = msg.Text
+	if m.shouldFail {
+		return &NotificationError{
+			Provider: m.name,
+			Message:  "mock error",
+		}
+	}
+	return nil
+}
+
+func (m *MockNotifier) SendRichMessage(ctx context.Context, channel string, blocks interface{}) error {
+	m.sendCalled = true
+	m.lastMessage = fmt.Sprintf("rich message to %s", channel)
 	if m.shouldFail {
 		return &NotificationError{
 			Provider: m.name,

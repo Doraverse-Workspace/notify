@@ -102,6 +102,11 @@ func SendWithOptions(ctx context.Context, provider string, msg *Message) error {
 	return Global().SendWithOptions(ctx, provider, msg)
 }
 
+// SendRichMessage sends a rich message to a specific provider using the global manager
+func SendRichMessage(ctx context.Context, provider, channel string, blocks interface{}) error {
+	return Global().SendRichMessage(ctx, provider, channel, blocks)
+}
+
 // Broadcast sends a message to all registered notifiers using the global manager
 func Broadcast(ctx context.Context, message string) []error {
 	return Global().Broadcast(ctx, message)

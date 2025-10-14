@@ -242,6 +242,40 @@ msg := &notify.Message{
 err := notifier.SendWithOptions(ctx, msg)
 ```
 
+### Rich Messages with Blocks (Slack)
+
+For Slack, you can send rich messages using blocks for advanced formatting:
+
+```go
+import "github.com/slack-go/slack"
+
+// Create Slack blocks
+blocks := []slack.Block{
+    slack.NewHeaderBlock(
+        slack.NewTextBlockObject("plain_text", "🚀 Deployment Notification", false, false),
+    ),
+    slack.NewSectionBlock(
+        slack.NewTextBlockObject("mrkdwn", "Your application has been successfully deployed!", false, false),
+        nil, nil,
+    ),
+    slack.NewDividerBlock(),
+    slack.NewSectionBlock(
+        nil,
+        []*slack.TextBlockObject{
+            slack.NewTextBlockObject("mrkdwn", "*Version:*\nv1.2.3", false, false),
+            slack.NewTextBlockObject("mrkdwn", "*Environment:*\nProduction", false, false),
+        },
+        nil,
+    ),
+}
+
+// Send using global interface
+err := notify.SendRichMessage(ctx, "slack", "#general", blocks)
+
+// Or using direct notifier
+err := slackNotifier.SendRichMessage(ctx, "#general", blocks)
+```
+
 ### Manager - Multiple Providers
 
 Use the Manager to handle multiple notification providers:
