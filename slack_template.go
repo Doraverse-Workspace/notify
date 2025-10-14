@@ -1,13 +1,16 @@
 package notify
 
 import (
+	"bytes"
+	"embed"
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"os"
-	"strings"
+	"path/filepath"
 	"sync"
+	"text/template"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/slack-go/slack"
 )
 
@@ -42,75 +45,146 @@ func LoadSlackBlocksFromFile(path string) (slack.Blocks, error) {
 	return blocks, nil
 }
 
-	// cache to avoid reading the same template multiple times
-var templateCache = struct {
-	sync.RWMutex
-	items map[string]string
-}{
-	items: make(map[string]string),
+var embeddedTemplates embed.FS
+
+type Config struct {
+	DevMode     bool   // true -> auto reload template on change
+	TemplateDir string // local path to watch (for dev)
 }
 
-// LoadSlackTemplate reads a JSON template file and supports:
-// - Replacing placeholders {{key}} in the content
-// - Caching the parsed template to avoid repeated reads
-// - Loading from embed.FS (if fsys != nil)
-func LoadSlackTemplate(path string, data map[string]string, fsys fs.FS) (slack.Blocks, error) {
-	var jsonStr string
-	var err error
+var (
+	config        = Config{DevMode: false, TemplateDir: "templates"}
+	cacheMu       sync.RWMutex
+	templateCache = make(map[string]*template.Template)
+	funcMap       = template.FuncMap{}
 
-	// 1️⃣ — Check cache
-	templateCache.RLock()
-	cached, ok := templateCache.items[path]
-	templateCache.RUnlock()
+	watcherOnce sync.Once
+)
 
-	if ok {
-		jsonStr = cached
-	} else {
-		// 2️⃣ — Read file (from embed.FS or OS)
-		var content []byte
-		if fsys != nil {
-			content, err = fs.ReadFile(fsys, path)
-		} else {
-			content, err = os.ReadFile(path)
-		}
-		if err != nil {
-			return slack.Blocks{}, fmt.Errorf("read file error: %w", err)
-		}
+// ---------------------- PUBLIC API ----------------------
 
-		jsonStr = string(content)
+func SetConfig(c Config) {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	config = c
+	if config.DevMode {
+		startWatcher()
+	}
+}
 
-		// Save cache
-		templateCache.Lock()
-		templateCache.items[path] = jsonStr
-		templateCache.Unlock()
+func AddTemplateFunc(name string, fn interface{}) {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	funcMap[name] = fn
+}
+
+func LoadTemplate(name string, data interface{}) ([]slack.Block, error) {
+	tmpl, err := getTemplate(name)
+	if err != nil {
+		return nil, err
 	}
 
-	// 3️⃣ — Replace placeholder {{key}} with value
-	for k, v := range data {
-		placeholder := fmt.Sprintf("{{%s}}", k)
-		jsonStr = strings.ReplaceAll(jsonStr, placeholder, v)
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, fmt.Errorf("execute template: %w", err)
 	}
 
-	// 4️⃣ — Parse to slack.Blocks
 	var payload map[string]interface{}
-	if err := json.Unmarshal([]byte(jsonStr), &payload); err != nil {
-		return slack.Blocks{}, fmt.Errorf("unmarshal payload error: %w", err)
+	if err := json.Unmarshal(buf.Bytes(), &payload); err != nil {
+		return nil, fmt.Errorf("unmarshal rendered JSON: %w", err)
 	}
 
 	blocksRaw, ok := payload["blocks"]
 	if !ok {
-		return slack.Blocks{}, fmt.Errorf("missing 'blocks' field in JSON")
+		return nil, fmt.Errorf("missing 'blocks' field")
 	}
 
 	blocksJSON, err := json.Marshal(blocksRaw)
 	if err != nil {
-		return slack.Blocks{}, fmt.Errorf("marshal blocks error: %w", err)
+		return nil, err
 	}
 
 	var blocks slack.Blocks
 	if err := json.Unmarshal(blocksJSON, &blocks); err != nil {
-		return slack.Blocks{}, fmt.Errorf("unmarshal blocks error: %w", err)
+		return nil, err
+	}
+	return blocks.BlockSet, nil
+}
+
+// ---------------------- INTERNAL ----------------------
+
+func getTemplate(name string) (*template.Template, error) {
+	cacheMu.RLock()
+	tmpl, ok := templateCache[name]
+	cacheMu.RUnlock()
+
+	if ok && !config.DevMode {
+		return tmpl, nil
 	}
 
-	return blocks, nil
+	var content []byte
+	var err error
+
+	// Try embedded first
+	content, err = embeddedTemplates.ReadFile(filepath.Join("templates", name))
+	if err != nil {
+		// Fallback to local file
+		content, err = os.ReadFile(filepath.Join(config.TemplateDir, name))
+		if err != nil {
+			return nil, fmt.Errorf("template not found: %s", name)
+		}
+	}
+
+	tmpl, err = template.New(name).Funcs(funcMap).Parse(string(content))
+	if err != nil {
+		return nil, fmt.Errorf("parse template: %w", err)
+	}
+
+	cacheMu.Lock()
+	templateCache[name] = tmpl
+	cacheMu.Unlock()
+
+	return tmpl, nil
+}
+
+// ---------------------- WATCHER ----------------------
+
+func startWatcher() {
+	watcherOnce.Do(func() {
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			fmt.Println("⚠️  fsnotify watcher error:", err)
+			return
+		}
+
+		go func() {
+			defer watcher.Close()
+			for {
+				select {
+				case event, ok := <-watcher.Events:
+					if !ok {
+						return
+					}
+					if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
+						file := filepath.Base(event.Name)
+						cacheMu.Lock()
+						delete(templateCache, file)
+						cacheMu.Unlock()
+						fmt.Printf("🔄 Reloaded Slack template: %s (%s)\n", file, event.Op)
+					}
+				case err, ok := <-watcher.Errors:
+					if ok {
+						fmt.Println("watch error:", err)
+					}
+				}
+			}
+		}()
+
+		err = watcher.Add(config.TemplateDir)
+		if err != nil {
+			fmt.Println("⚠️  Cannot watch directory:", err)
+		} else {
+			fmt.Println("👀 Watching template directory:", config.TemplateDir)
+		}
+	})
 }
